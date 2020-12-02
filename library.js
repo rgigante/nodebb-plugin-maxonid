@@ -179,6 +179,10 @@
 		winston.verbose('[maxonID] --> OAuth.login');
 		console.log(payload);
 
+		if (!payload.isAllowed) {
+			return callback(new Error('The entitlement was missing from the user, we cannot log them in.'));
+		}
+
 		OAuth.getUidByOAuthid(payload.oAuthid, function (err, uid) {
 			if (err) { return callback(err); }
 
@@ -266,7 +270,6 @@
 
 	OAuth.redirectLogout = function (payload, callback) {
 		winston.verbose('[maxonID] --> OAuth.redirectLogout');
-		console.log(constants.oauth2.logoutURL);
 
 		if (constants.oauth2.logoutURL) {
 			winston.verbose('Changing logout to OpenID logout');
@@ -276,7 +279,8 @@
 			} else {
 				separator = '&';
 			}
-			payload.next = constants.oauth2.logoutURL + separator + 'client_id=' + constants.oauth2.clientID;
+			// payload.next = constants.oauth2.logoutURL + separator + 'client_id=' + constants.oauth2.clientID;
+			payload.next = constants.oauth2.logoutURL + separator + 'triggerSingleSignout=true';
 		}
 
 		return callback(null, payload);
