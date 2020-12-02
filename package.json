@@ -1,11 +1,11 @@
 {
-  "name": "nodebb-plugin-sso-oauth",
-  "version": "0.4.0",
-  "description": "NodeBB Generic OAuth SSO",
+  "name": "nodebb-plugin-maxonID",
+  "version": "0.1.0",
+  "description": "Maxon ID OAuth SSO plugin",
   "main": "library.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/julianlam/nodebb-plugin-sso-oauth"
+    "url": "https://github.com/rgigante/nodebb-plugin-maxonID"
   },
   "keywords": [
     "nodebb",
@@ -23,7 +23,7 @@
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/julianlam/nodebb-plugin-sso-oauth/issues"
+    "url": "https://github.com/rgigante/nodebb-plugin-maxonID/issues"
   },
   "readme": "",
   "readmeFilename": "README.md",

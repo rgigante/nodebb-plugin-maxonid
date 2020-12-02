@@ -1,8 +1,8 @@
 {
-	"id": "nodebb-plugin-sso-oauth",
-	"name": "NodeBB OAuth SSO",
-	"description": "NodeBB Plugin that allows users to login/register via any configured OAuth provider.",
-	"url": "https://github.com/julianlam/nodebb-plugin-sso-oauth",
+	"id": "nodebb-plugin-maxonID",
+	"name": "Maxon ID OAuth SSO plugin",
+	"description": "NodeBB Plugin that allows users to login/register via Maxon ID OAuth provider.",
+	"url": "https://github.com/rgigante/nodebb-plugin-maxonID",
 	"library": "./library.js",
 	"hooks": [
 		{ "hook": "static:user.delete", "method": "deleteUserData" },
