@@ -1,5 +1,5 @@
 {
-	"id": "nodebb-plugin-maxonID",
+	"id": "nodebb-plugin-maxonid",
 	"name": "Maxon ID OAuth SSO plugin",
 	"description": "NodeBB Plugin that allows users to login/register via Maxon ID OAuth provider.",
 	"url": "https://github.com/rgigante/nodebb-plugin-maxonID",
