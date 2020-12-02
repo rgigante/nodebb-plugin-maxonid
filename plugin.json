@@ -2,11 +2,24 @@
 	"id": "nodebb-plugin-maxonid",
 	"name": "Maxon ID OAuth SSO plugin",
 	"description": "NodeBB Plugin that allows users to login/register via Maxon ID OAuth provider.",
-	"url": "https://github.com/rgigante/nodebb-plugin-maxonID",
+	"url": "https://github.com/rgigante/nodebb-plugin-maxonid",
 	"library": "./library.js",
 	"hooks": [
-		{ "hook": "static:user.delete", "method": "deleteUserData" },
-		{ "hook": "filter:user.whitelistFields", "method": "whitelistFields" },
-		{ "hook": "filter:auth.init", "method": "getStrategy" }
+		{ 
+			"hook": "static:user.delete", 
+			"method": "deleteUserData" 
+		},
+		{ 
+			"hook": "filter:user.whitelistFields", 
+			"method": "whitelistFields" 
+		},
+		{ 
+			"hook": "filter:auth.init", 
+			"method": "getStrategy" 
+		},
+    {
+      "hook": "filter:user.logout",
+      "method": "redirectLogout"
+    }
 	]
 }

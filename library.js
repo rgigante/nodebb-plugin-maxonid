@@ -7,6 +7,8 @@
 	const authenticationController = require.main.require('./src/controllers/authentication');
 
 	const async = require('async');
+
+	// modules to execute HTTP requests
 	const axios = require('axios');
 	const unirest = require('unirest');
 
@@ -20,6 +22,7 @@
 		oauth2: {
 			authorizationURL: nconf.get('oauth_plugin:authorizationURL'),
 			tokenURL: nconf.get('oauth_plugin:tokenURL'),
+			logoutURL: nconf.get('oauth_plugin:logoutURL'),
 			clientID: nconf.get('oauth_plugin:clientID'),
 			clientSecret: nconf.get('oauth_plugin:clientSecret'),
 		},
@@ -34,18 +37,18 @@
 	let opts;
 
 	if (!constants.name) {
-		winston.error('[sso-oauth] --> Please specify a name for your OAuth provider (library.js:32)');
+		winston.error('[maxonID] --> Please specify a name for your OAuth provider (library.js:32)');
 	} 	else if (!constants.type || constants.type !== 'oauth2') {
-		winston.error('[sso-oauth] --> Please specify an OAuth strategy to utilise (library.js:31)');
+		winston.error('[maxonID] --> Please specify an OAuth strategy to utilise (library.js:31)');
 	} else if (!constants.userRoute) 	{
-		winston.error('[sso-oauth] --> User Route required (library.js:31)');
+		winston.error('[maxonID] --> User Route required (library.js:31)');
 	} else {
 		configOk = true;
-		winston.info('[sso-oauth] --> Config is OK');
+		winston.info('[maxonID] --> Config is OK');
 	}
 
 	OAuth.getStrategy = function (strategies, callback) {
-		winston.verbose('[sso-oauth] --> OAuth.getStrategy');
+		winston.verbose('[maxonID] --> OAuth.getStrategy');
 		if (configOk) {
 			passportOAuth = require('passport-oauth2');
 
@@ -84,7 +87,7 @@
 			opts.callbackURL = nconf.get('url') + '/auth/' + constants.name + '/callback';
 			opts.passReqToCallback = true;
 
-			winston.verbose('[sso-oauth] --> Options:');
+			winston.verbose('[maxonID] --> Options:');
 			console.log(opts);
 
 			passport.use(constants.name, new passportOAuth(opts, function (req, token, secret, profile, done) {
@@ -125,7 +128,7 @@
 	};
 
 	OAuth.validateEntitlement = function (token, entitlement, callback)	{
-		winston.verbose('[sso-auth] --> OAuth.validateEntitlement');
+		winston.verbose('[maxonID] --> OAuth.validateEntitlement');
 
 		unirest('GET', 'https://id-dev.villa.maxon.net/authz/.json?' + entitlement.toString() + '&doConsume=false')
 			.headers({
@@ -140,7 +143,7 @@
 	};
 
 	OAuth.validateEntitlement2 = function (token, entitlement, callback) {
-		winston.verbose('[sso-auth] --> OAuth.validateEntitlement');
+		winston.verbose('[maxonID] --> OAuth.validateEntitlement');
 
 		var config = {
 			method: 'get',
@@ -161,7 +164,7 @@
 	};
 
 	OAuth.parseUserReturn = function (data, callback) {
-		winston.verbose('[sso-auth] --> OAuth.parseUserReturn');
+		winston.verbose('[maxonID] --> OAuth.parseUserReturn');
 
 		var profile = {};
 		profile.id = data.sub;
@@ -173,7 +176,7 @@
 	};
 
 	OAuth.login = function (payload, callback) {
-		winston.verbose('[sso-auth] --> OAuth.login');
+		winston.verbose('[maxonID] --> OAuth.login');
 		console.log(payload);
 
 		OAuth.getUidByOAuthid(payload.oAuthid, function (err, uid) {
@@ -238,7 +241,7 @@
 	};
 
 	OAuth.deleteUserData = function (data, callback) {
-		winston.verbose('[sso-auth] --> OAuth.deleteUserData');
+		winston.verbose('[maxonID] --> OAuth.deleteUserData');
 		async.waterfall([
 			async.apply(User.getUserField, data.uid, constants.name + 'Id'),
 			function (oAuthIdToDelete, next) {
@@ -246,7 +249,7 @@
 			},
 		], function (err) {
 			if (err) {
-				winston.error('[sso-oauth] --> Could not remove OAuthId data for uid ' + data.uid + '. Error: ' + err);
+				winston.error('[maxonID] --> Could not remove OAuthId data for uid ' + data.uid + '. Error: ' + err);
 				return callback(err);
 			}
 
@@ -256,24 +259,24 @@
 
 	// If this filter is not there, the deleteUserData function will fail when getting the oauthId for deletion.
 	OAuth.whitelistFields = function (params, callback) {
-		winston.verbose('[sso-auth] --> OAuth.whitelistFields');
+		winston.verbose('[maxonID] --> OAuth.whitelistFields');
 		params.whitelist.push(constants.name + 'Id');
 		callback(null, params);
 	};
 
 	OAuth.redirectLogout = function (payload, callback) {
-		winston.verbose('[sso-auth] --> OAuth.redirectLogout');
-		const settings = constants.pluginSettings.getWrapper();
+		winston.verbose('[maxonID] --> OAuth.redirectLogout');
+		console.log(constants.oauth2.logoutURL);
 
-		if (settings.logoutEndpoint) {
+		if (constants.oauth2.logoutURL) {
 			winston.verbose('Changing logout to OpenID logout');
 			let separator;
-			if (settings.logoutEndpoint.indexOf('?') === -1) {
+			if (constants.oauth2.logoutURL.indexOf('?') === -1) {
 				separator = '?';
 			} else {
 				separator = '&';
 			}
-			payload.next = settings.logoutEndpoint + separator + 'client_id=' + settings.clientId;
+			payload.next = constants.oauth2.logoutURL + separator + 'client_id=' + constants.oauth2.clientID;
 		}
 
 		return callback(null, payload);
