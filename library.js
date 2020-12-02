@@ -180,7 +180,7 @@
 		console.log(payload);
 
 		if (!payload.isAllowed) {
-			return callback(new Error('The entitlement was missing from the user, we cannot log them in.'));
+			return callback(new Error('The access to the forum is not granted. Please contact Maxon Beta Community Manager.'));
 		}
 
 		OAuth.getUidByOAuthid(payload.oAuthid, function (err, uid) {
