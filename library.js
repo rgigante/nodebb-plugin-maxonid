@@ -1,7 +1,5 @@
 'use strict';
 
-// const { user } = require('../../nodebb/src/controllers');
-
 (function (module) {
 	const User = require.main.require('./src/user');
 	const Groups = require.main.require('./src/groups');
@@ -19,7 +17,6 @@
 	const winston = module.parent.require('winston');
 
 	const constants = Object.freeze({
-		type: nconf.get('oauth_plugin:type'),
 		name: nconf.get('oauth_plugin:name'),
 		oauth2: {
 			authorizationURL: nconf.get('oauth_plugin:authorizationURL'),
@@ -33,22 +30,24 @@
 		allowedEntitlement: nconf.get('oauth_plugin:allowedEntitlement'),
 	});
 
-	const OAuth = {};
 	let configOk = false;
-	let passportOAuth;
-	let opts;
-	let userMaxonIDIsEmpty = true;
-
 	if (!constants.name) {
-		winston.error('[maxonID] --> Please specify a name for your OAuth provider (library.js:32)');
-	} 	else if (!constants.type || constants.type !== 'oauth2') {
-		winston.error('[maxonID] --> Please specify an OAuth strategy to utilise (library.js:31)');
+		winston.error('[maxonID] --> Please specify a name for your OAuth provider');
 	} else if (!constants.userRoute) 	{
-		winston.error('[maxonID] --> User Route required (library.js:31)');
+		winston.error('[maxonID] --> User Route required');
 	} else {
 		configOk = true;
 		winston.info('[maxonID] --> Config is OK');
 	}
+
+	const OAuth = { userMaxonIDIsEmpty: true };
+	const opts = constants.oauth2;
+	opts.callbackURL = nconf.get('url') + '/auth/' + constants.name + '/callback';
+	opts.passReqToCallback = true;
+	let passportOAuth;
+
+	winston.verbose('[maxonID] --> Options:');
+	console.log(opts);
 
 	OAuth.getStrategy = function (strategies, callback) {
 		winston.verbose('[maxonID] --> OAuth.getStrategy');
@@ -76,7 +75,7 @@
 						}
 
 						if (!accessAllowed) {
-							// Need to find a way to gracely notify the user and point back to login page
+							// Need to find a way to gracefully notify the user and point back to login page
 							return done(new Error('Forum access is not granted. Please contact your Maxon representative.'));
 						}
 
@@ -96,13 +95,6 @@
 					});
 				});
 			};
-
-			opts = constants.oauth2;
-			opts.callbackURL = nconf.get('url') + '/auth/' + constants.name + '/callback';
-			opts.passReqToCallback = true;
-
-			winston.verbose('[maxonID] --> Options:');
-			console.log(opts);
 
 			passport.use(constants.name, new passportOAuth(opts, function (req, token, secret, profile, done) {
 				OAuth.login({
@@ -277,7 +269,7 @@
 
 	// If this filter is not there, the deleteUserData function will fail when getting the oauthId for deletion.
 	OAuth.whitelistFields = function (params, callback) {
-		winston.verbose('[maxonID] --> OAuth.whitelistFields');
+		// winston.verbose('[maxonID] --> OAuth.whitelistFields');
 		params.whitelist.push(constants.name + 'Id');
 		callback(null, params);
 	};
@@ -285,8 +277,8 @@
 	OAuth.redirectLogout = function (payload, callback) {
 		winston.verbose('[maxonID] --> OAuth.redirectLogout');
 
-		console.log('userMaxonIDIsEmpty: ', userMaxonIDIsEmpty);
-		if (constants.oauth2.logoutURL && !userMaxonIDIsEmpty) {
+		console.log('userMaxonIDIsEmpty: ', OAuth.userMaxonIDIsEmpty);
+		if (constants.oauth2.logoutURL && !OAuth.userMaxonIDIsEmpty) {
 			winston.verbose('Changing logout to Maxon ID logout');
 			let separator;
 			if (constants.oauth2.logoutURL.indexOf('?') === -1) {
@@ -294,8 +286,11 @@
 			} else {
 				separator = '&';
 			}
-			// payload.next = constants.oauth2.logoutURL + separator + 'client_id=' + constants.oauth2.clientID;
+			// define the right logout redirect
 			payload.next = constants.oauth2.logoutURL + separator + 'triggerSingleSignout=true';
+
+			// reset the property to the true state
+			OAuth.userMaxonIDIsEmpty = true;
 		}
 		console.log(payload.next);
 
@@ -309,7 +304,10 @@
 				winston.error('[maxonID] --> Could not find data for uid ' + params.uid + '. Error: ' + err);
 				return callback(err);
 			}
-			if (data[constants.name + 'Id'] && data[constants.name + 'Id'].length !== 0) userMaxonIDIsEmpty = false;
+			if (data[constants.name + 'Id'] != null && data[constants.name + 'Id'].length !== 0) {
+				// set property to false to make redirectLogout to redirect only Maxon ID(s)
+				OAuth.userMaxonIDIsEmpty = false;
+			}
 			callback(null, params);
 		});
 	};
