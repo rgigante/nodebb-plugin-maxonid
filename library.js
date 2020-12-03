@@ -1,5 +1,7 @@
 'use strict';
 
+// const { user } = require('../../nodebb/src/controllers');
+
 (function (module) {
 	const User = require.main.require('./src/user');
 	const Groups = require.main.require('./src/groups');
@@ -35,6 +37,7 @@
 	let configOk = false;
 	let passportOAuth;
 	let opts;
+	let userMaxonIDIsEmpty = true;
 
 	if (!constants.name) {
 		winston.error('[maxonID] --> Please specify a name for your OAuth provider (library.js:32)');
@@ -67,19 +70,30 @@
 						return done(new Error('Unexpected response from userInfo. [' + res.statusCode + '] [' + body + ']'));
 					}
 
-					try {
-						var json = JSON.parse(body);
-						OAuth.parseUserReturn(json, function (err, profile) {
-							if (err) { return done(err); }
+					OAuth.validateEntitlement(accessToken, constants.allowedEntitlement, function (err, accessAllowed) {
+						if (err) {
+							return done(err);
+						}
 
-							profile.provider = constants.name;
-							profile.isAdmin = false;
-							console.log(profile);
-							done(null, profile);
-						});
-					} catch (e) {
-						done(e);
-					}
+						if (!accessAllowed) {
+							// Need to find a way to gracely notify the user and point back to login page
+							return done(new Error('Forum access is not granted. Please contact your Maxon representative.'));
+						}
+
+						try {
+							var json = JSON.parse(body);
+							OAuth.parseUserReturn(json, function (err, profile) {
+								if (err) { return done(err); }
+
+								profile.provider = constants.name;
+								profile.isAdmin = false;
+								console.log(profile);
+								done(null, profile);
+							});
+						} catch (e) {
+							done(e);
+						}
+					});
 				});
 			};
 
@@ -91,25 +105,18 @@
 			console.log(opts);
 
 			passport.use(constants.name, new passportOAuth(opts, function (req, token, secret, profile, done) {
-				OAuth.validateEntitlement(token, constants.allowedEntitlement, function (err, isOK) {
+				OAuth.login({
+					oAuthid: profile.id,
+					handle: profile.displayName,
+					email: profile.emails[0].value,
+					isAdmin: profile.isAdmin,
+				}, function (err, user) {
 					if (err) {
 						return done(err);
 					}
 
-					OAuth.login({
-						oAuthid: profile.id,
-						handle: profile.displayName,
-						email: profile.emails[0].value,
-						isAdmin: profile.isAdmin,
-						isAllowed: isOK,
-					}, function (err, user) {
-						if (err) {
-							return done(err);
-						}
-
-						authenticationController.onSuccessfulLogin(req, user.uid);
-						done(null, user);
-					});
+					authenticationController.onSuccessfulLogin(req, user.uid);
+					done(null, user);
 				});
 			}));
 
@@ -117,7 +124,7 @@
 				name: constants.name,
 				url: '/auth/' + constants.name,
 				callbackURL: '/auth/' + constants.name + '/callback',
-				icon: 'fa-check-square',
+				icon: 'fa-lock',
 				scope: (constants.scope || '').split(','),
 			});
 
@@ -179,10 +186,6 @@
 		winston.verbose('[maxonID] --> OAuth.login');
 		console.log(payload);
 
-		if (!payload.isAllowed) {
-			return callback(new Error('The access to the forum is not granted. Please contact Maxon Beta Community Manager.'));
-		}
-
 		OAuth.getUidByOAuthid(payload.oAuthid, function (err, uid) {
 			if (err) { return callback(err); }
 
@@ -236,11 +239,22 @@
 	};
 
 	OAuth.getUidByOAuthid = function (oAuthid, callback) {
+		winston.verbose('[maxonID] --> OAuth.getUidByOAuthid');
 		db.getObjectField(constants.name + 'Id:uid', oAuthid, function (err, uid) {
 			if (err) {
 				return callback(err);
 			}
 			callback(null, uid);
+		});
+	};
+
+	OAuth.getOAuthidByUid = function (uid, callback) {
+		winston.verbose('[maxonID] --> OAuth.getOAuthidByUid');
+		db.getObjectField('uid', uid, function (err, oAuthid) {
+			if (err) {
+				return callback(err);
+			}
+			callback(null, oAuthid);
 		});
 	};
 
@@ -271,8 +285,9 @@
 	OAuth.redirectLogout = function (payload, callback) {
 		winston.verbose('[maxonID] --> OAuth.redirectLogout');
 
-		if (constants.oauth2.logoutURL) {
-			winston.verbose('Changing logout to OpenID logout');
+		console.log('userMaxonIDIsEmpty: ', userMaxonIDIsEmpty);
+		if (constants.oauth2.logoutURL && !userMaxonIDIsEmpty) {
+			winston.verbose('Changing logout to Maxon ID logout');
 			let separator;
 			if (constants.oauth2.logoutURL.indexOf('?') === -1) {
 				separator = '?';
@@ -282,8 +297,21 @@
 			// payload.next = constants.oauth2.logoutURL + separator + 'client_id=' + constants.oauth2.clientID;
 			payload.next = constants.oauth2.logoutURL + separator + 'triggerSingleSignout=true';
 		}
+		console.log(payload.next);
 
 		return callback(null, payload);
+	};
+
+	OAuth.userLoggedOut = function (params, callback) {
+		winston.verbose('[maxonID] --> OAuth.userLoggedOut');
+		User.getUserData(params.uid, function (err, data) {
+			if (err) {
+				winston.error('[maxonID] --> Could not find data for uid ' + params.uid + '. Error: ' + err);
+				return callback(err);
+			}
+			if (data[constants.name + 'Id'] && data[constants.name + 'Id'].length !== 0) userMaxonIDIsEmpty = false;
+			callback(null, params);
+		});
 	};
 
 	module.exports = OAuth;
