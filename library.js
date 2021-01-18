@@ -19,16 +19,19 @@
 	const constants = Object.freeze({
 		name: nconf.get('oauth_plugin:name'),
 		oauth2: {
-			authorizationURL: nconf.get('oauth_plugin:authorizationURL'),
-			tokenURL: nconf.get('oauth_plugin:tokenURL'),
-			logoutURL: nconf.get('oauth_plugin:logoutURL'),
+			authorizationURL: nconf.get('oauth_plugin:idserver') + nconf.get('oauth_plugin:authorizationURL'),
+			tokenURL: nconf.get('oauth_plugin:idserver') + nconf.get('oauth_plugin:tokenURL'),
+			logoutURL: nconf.get('oauth_plugin:idserver') + nconf.get('oauth_plugin:logoutURL'),
 			clientID: nconf.get('oauth_plugin:clientID'),
 			clientSecret: nconf.get('oauth_plugin:clientSecret'),
 		},
-		userRoute: nconf.get('oauth_plugin:userRoute'),
+		userRoute: nconf.get('oauth_plugin:idserver') + nconf.get('oauth_plugin:userRoute'),
 		scope: nconf.get('oauth_plugin:scope'),
 		allowedEntitlement: nconf.get('oauth_plugin:allowedEntitlement'),
 	});
+
+	winston.verbose('[maxonID] --> Constants');
+	console.log(constants);
 
 	let configOk = false;
 	if (!constants.name) {
@@ -46,6 +49,7 @@
 	opts.passReqToCallback = true;
 	let passportOAuth;
 
+	// debug options
 	winston.verbose('[maxonID] --> Options:');
 	console.log(opts);
 
@@ -86,6 +90,8 @@
 
 								profile.provider = constants.name;
 								profile.isAdmin = false;
+
+								winston.verbose('[maxonID] --> Profile:');
 								console.log(profile);
 								done(null, profile);
 							});
@@ -102,6 +108,8 @@
 					handle: profile.displayName,
 					email: profile.emails[0].value,
 					isAdmin: profile.isAdmin,
+					name: profile.givenName,
+					surname: profile.familyName,
 				}, function (err, user) {
 					if (err) {
 						return done(err);
@@ -126,10 +134,11 @@
 		}
 	};
 
+	// uses unirest API
 	OAuth.validateEntitlement = function (token, entitlement, callback)	{
 		winston.verbose('[maxonID] --> OAuth.validateEntitlement');
 
-		unirest('GET', 'https://id-dev.villa.maxon.net/authz/.json?' + entitlement.toString() + '&doConsume=false')
+		unirest('GET', nconf.get('oauth_plugin:idserver') + '/authz/.json?' + entitlement.toString() + '&doConsume=false')
 			.headers({
 				Authorization: 'Bearer ' + token.toString(),
 			})
@@ -141,12 +150,13 @@
 			});
 	};
 
+	// uses Axios API
 	OAuth.validateEntitlement2 = function (token, entitlement, callback) {
 		winston.verbose('[maxonID] --> OAuth.validateEntitlement');
 
 		var config = {
 			method: 'get',
-			url: 'https://id-dev.villa.maxon.net/authz/.json?' + entitlement.toString() + '&doConsume=false',
+			url: nconf.get('oauth_plugin:idserver') + '/authz/.json?' + entitlement.toString() + '&doConsume=false',
 			headers: {
 				Authorization: 'Bearer ' + token.toString(),
 			},
@@ -164,9 +174,12 @@
 
 	OAuth.parseUserReturn = function (data, callback) {
 		winston.verbose('[maxonID] --> OAuth.parseUserReturn');
+		console.log(data);
 
 		var profile = {};
 		profile.id = data.sub;
+		profile.givenName = data.given_name;
+		profile.familyName = data.family_name;
 		profile.displayName = data.email.split('@')[0];
 		profile.emails = [{ value: data.email }];
 
@@ -176,9 +189,11 @@
 
 	OAuth.login = function (payload, callback) {
 		winston.verbose('[maxonID] --> OAuth.login');
+		winston.verbose('[maxonID] --> Payload:');
 		console.log(payload);
 
 		OAuth.getUidByOAuthid(payload.oAuthid, function (err, uid) {
+			winston.verbose('[maxonID] --> OAuth.getUidByOAuthid');
 			if (err) { return callback(err); }
 
 			if (uid !== null) {
@@ -189,9 +204,13 @@
 			} else {
 				// New User
 				var success = function (uid) {
-					// Save provider-specific information to the user
+					// save provider-specific information to the user
+					// save oAuthID
 					User.setUserField(uid, constants.name + 'Id', payload.oAuthid);
 					db.setObjectField(constants.name + 'Id:uid', payload.oAuthid, uid);
+					// save name and surname
+					User.setUserField(uid, 'fullname', payload.name + ' ' + payload.surname);
+					db.setObjectField('fullname', payload.name + ' ' + payload.surname, uid);
 
 					if (payload.isAdmin) {
 						Groups.join('administrators', uid, function (err) {
@@ -269,7 +288,7 @@
 
 	// If this filter is not there, the deleteUserData function will fail when getting the oauthId for deletion.
 	OAuth.whitelistFields = function (params, callback) {
-		// winston.verbose('[maxonID] --> OAuth.whitelistFields');
+		winston.verbose('[maxonID] --> OAuth.whitelistFields');
 		params.whitelist.push(constants.name + 'Id');
 		callback(null, params);
 	};
