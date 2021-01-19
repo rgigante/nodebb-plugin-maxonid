@@ -86,7 +86,7 @@
 		// "block-scoped-var": "off",
 		// "operator-assignment": "off",
 		// "yoda": "off",
-		// "no-loop-func": "off",
+		"no-loop-func": "off",
 		// "no-void": "off",
 		// "valid-jsdoc": "off",
 		// "no-cond-assign": "off",
