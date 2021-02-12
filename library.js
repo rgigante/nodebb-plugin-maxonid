@@ -235,7 +235,13 @@
 		profile.id = data.sub;
 		profile.givenName = data.given_name;
 		profile.familyName = data.family_name;
-		profile.displayName = data.email.split('@')[0];
+
+		// check given_name and family_name to generate a proper username (aka displayName)
+		if (data.given_name === undefined || data.given_name === '' || data.family_name === undefined || data.family_name === '') {
+			profile.displayName = data.email.split('@')[0];
+		} else {
+			profile.displayName = data.given_name.toLowerCase()[0] + '_' + data.family_name.toLowerCase();
+		}
 		profile.emails = [{ value: data.email }];
 
 		// eslint-disable-next-line
