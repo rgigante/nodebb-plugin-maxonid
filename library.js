@@ -1,8 +1,8 @@
 'use strict';
 
 (function (module) {
-	const User = require.main.require('./src/user');
-	const Groups = require.main.require('./src/groups');
+	const user = require.main.require('./src/user');
+	const groups = require.main.require('./src/groups');
 	const db = require.main.require('./src/database');
 	const authenticationController = require.main.require('./src/controllers/authentication');
 
@@ -16,7 +16,7 @@
 	const useUnirestAPI = true;
 
 	// activate debug output
-	const debugOutput = true;
+	const debugOutput = false;
 
 	// create constants object
 	const constants = Object.freeze({
@@ -34,31 +34,31 @@
 	});
 
 	if (debugOutput) {
-		winston.verbose('[maxonID] --> Configuration');
+		winston.verbose('[maxonID] Configuration');
 		console.log(constants);
 	}
 
 	// check the contants object for contain data
 	let configOk = false;
 	if (!constants.name) {
-		winston.error('[maxonID] --> Please specify a name for your OAuth provider');
+		winston.error('[maxonID] Please specify a name for your OAuth provider');
 	} else if (!constants.oauth2.clientID) {
-		winston.error('[maxonID] --> ClientID required');
+		winston.error('[maxonID] ClientID required');
 	} else if (!constants.oauth2.clientSecret) {
-		winston.error('[maxonID] --> Client Secret required');
+		winston.error('[maxonID] Client Secret required');
 	} else if (!constants.oauth2.authorizationURL) {
-		winston.error('[maxonID] --> Authorization URL required');
+		winston.error('[maxonID] Authorization URL required');
 	} else if (!constants.oauth2.tokenURL) {
-		winston.error('[maxonID] --> Token URL required');
+		winston.error('[maxonID] Token URL required');
 	} else if (!constants.scope) {
-		winston.error('[maxonID] --> Scope required');
+		winston.error('[maxonID] Scope required');
 	} else if (!constants.userRoute) {
-		winston.error('[maxonID] --> User Route required');
+		winston.error('[maxonID] User Route required');
 	} else if (!constants.allowedEntitlementsList) {
-		winston.error('[maxonID] --> Allowed entitlements list required');
+		winston.error('[maxonID] Allowed entitlements list required');
 	} else {
 		configOk = true;
-		winston.info('[maxonID] --> Config is OK');
+		winston.info('[maxonID] Config is OK');
 	}
 
 	// add member variable userMaxonIDIsEmpty to identify if a user is authenticated with Maxon ID
@@ -68,7 +68,7 @@
 	oauthOptions.passReqToCallback = true;
 
 	OAuth.getStrategy = function (strategies, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] --> OAuth.getStrategy'); }
+		if (debugOutput) { winston.verbose('[maxonID] OAuth.getStrategy'); }
 
 		let passportOAuth;
 		if (configOk) {
@@ -92,7 +92,7 @@
 					// validate the user permissions given the current access token and the list of allowed entitlements
 					OAuth.validateEntitlementsList(accessToken, constants.allowedEntitlementsList, function (err, accessAllowed) {
 						if (debugOutput) {
-							winston.verbose('[maxonID] --> Please specify a name for your OAuth provider');
+							winston.verbose('[maxonID] Please specify a name for your OAuth provider');
 							console.log('validateEntitlementsList result:', accessAllowed);
 						}
 
@@ -116,7 +116,7 @@
 								profile.isAdmin = false;
 
 								if (debugOutput) {
-									winston.verbose('[maxonID] --> Profile:');
+									winston.verbose('[maxonID] Profile:');
 									console.log(profile);
 								}
 
@@ -162,7 +162,7 @@
 	};
 
 	OAuth.validateEntitlementsList = function (token, entitlementsList, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] --> OAuth.validateEntitlementsList'); }
+		if (debugOutput) { winston.verbose('[maxonID] OAuth.validateEntitlementsList'); }
 		let completed_requests = 0; // count the number of requests completed
 		let isAllowed = false; // store (sums via or) the entitlements allowance
 		// loop through all the entitlements set in nodebb config.json
@@ -182,7 +182,7 @@
 	};
 
 	OAuth.checkEntitlement = function (inputData, callback) {
-		if (debugOutput) winston.verbose('[maxonID] --> OAuth.checkEntitlement');
+		if (debugOutput) winston.verbose('[maxonID] OAuth.checkEntitlement');
 		if (useUnirestAPI) {
 			const unirest = require('unirest');
 			unirest('GET', nconf.get('oauth_plugin:idserver') + '/authz/.json?' + inputData[1] + '&doConsume=false')
@@ -227,7 +227,7 @@
 
 	OAuth.parseUserReturn = function (data, callback) {
 		if (debugOutput) {
-			winston.verbose('[maxonID] --> OAuth.parseUserReturn');
+			winston.verbose('[maxonID] OAuth.parseUserReturn');
 			console.log(data);
 		}
 
@@ -250,41 +250,41 @@
 
 	OAuth.login = function (payload, callback) {
 		if (debugOutput) {
-			winston.verbose('[maxonID] --> OAuth.login');
+			winston.verbose('[maxonID] OAuth.login');
 			console.log(payload);
 		}
 
 		OAuth.getUidByOAuthid(payload.oAuthid, function (err, uid) {
-			if (debugOutput) { winston.verbose('[maxonID] --> OAuth.getUidByOAuthid'); }
+			if (debugOutput) { winston.verbose('[maxonID] OAuth.getUidByOAuthid'); }
 
 			if (err) { return callback(err); }
 
 			if (uid !== null) {
-				// Existing User
+				// Existing user
 				callback(null, {
 					uid: uid,
 				});
 			} else {
-				// New User
+				// New user
 				const success = function (uid) {
 					// store oAuthID information
-					User.setUserField(uid, constants.name + 'Id', payload.oAuthid);
+					user.setUserField(uid, constants.name + 'Id', payload.oAuthid);
 					db.setObjectField(constants.name + 'Id:uid', payload.oAuthid, uid);
 
 					// store name and surname
-					User.setUserField(uid, 'fullname', payload.name + ' ' + payload.surname);
+					user.setUserField(uid, 'fullname', payload.name + ' ' + payload.surname);
 					db.setObjectField('fullname', payload.name + ' ' + payload.surname, uid);
 
 					// add user to "Maxon" group if registered email address belongs to "maxon.net" domain
 					if (payload.email.split('@')[1] === 'maxon.net' || payload.email.split('@')[1] === 'redgiant.com') {
-						Groups.join('Maxon', uid, function (err) {
+						groups.join('Maxon', uid, function (err) {
 							callback(err, { uid: uid });
 						});
 					}
 
 					// add user to administrator group
 					if (payload.isAdmin) {
-						Groups.join('administrators', uid, function (err) {
+						groups.join('administrators', uid, function (err) {
 							callback(err, { uid: uid });
 						});
 					}
@@ -292,11 +292,11 @@
 					callback(null, { uid: uid });
 				};
 
-				User.getUidByEmail(payload.email, function (err, uid) {
+				user.getUidByEmail(payload.email, function (err, uid) {
 					if (err) { return callback(err); }
 
 					if (!uid) {
-						User.create({
+						user.create({
 							username: payload.handle,
 							email: payload.email,
 						}, function (err, uid) {
@@ -313,7 +313,7 @@
 	};
 
 	OAuth.getUidByOAuthid = function (oAuthid, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] --> OAuth.getUidByOAuthid'); }
+		if (debugOutput) { winston.verbose('[maxonID] OAuth.getUidByOAuthid'); }
 		db.getObjectField(constants.name + 'Id:uid', oAuthid, function (err, uid) {
 			if (err) return callback(err);
 
@@ -322,16 +322,16 @@
 	};
 
 	OAuth.deleteUserData = function (data, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] --> OAuth.deleteUserData'); }
+		if (debugOutput) { winston.verbose('[maxonID] OAuth.deleteUserData'); }
 
 		async.waterfall([
-			async.apply(User.getUserField, data.uid, constants.name + 'Id'),
+			async.apply(user.getUserField, data.uid, constants.name + 'Id'),
 			function (oAuthIdToDelete, next) {
 				db.deleteObjectField(constants.name + 'Id:uid', oAuthIdToDelete, next);
 			},
 		], function (err) {
 			if (err) {
-				winston.error('[maxonID] --> Could not remove OAuthId data for uid ' + data.uid + '. Error: ' + err);
+				winston.error('[maxonID] Could not remove OAuthId data for uid ' + data.uid + '. Error: ' + err);
 				return callback(err);
 			}
 
@@ -341,7 +341,7 @@
 
 	// If this filter is not there, the deleteUserData function will fail when getting the oauthId for deletion.
 	OAuth.whitelistFields = function (params, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] --> OAuth.whitelistFields'); }
+		if (debugOutput) { winston.verbose('[maxonID] OAuth.whitelistFields'); }
 
 		params.whitelist.push(constants.name + 'Id');
 		callback(null, params);
@@ -349,12 +349,12 @@
 
 	OAuth.redirectLogout = function (payload, callback) {
 		if (debugOutput) {
-			winston.verbose('[maxonID] --> OAuth.redirectLogout');
+			winston.verbose('[maxonID] OAuth.redirectLogout');
 			console.log('userMaxonIDIsEmpty: ', OAuth.userMaxonIDIsEmpty);
 		}
 
 		if (constants.oauth2.logoutURL && !OAuth.userMaxonIDIsEmpty) {
-			winston.info('[maxonID] --> Changing logout to Maxon ID logout');
+			winston.info('[maxonID] Changing logout to Maxon ID logout');
 			let separator;
 
 			if (constants.oauth2.logoutURL.indexOf('?') === -1) { separator = '?'; } else separator = '&';
@@ -369,11 +369,11 @@
 	};
 
 	OAuth.userLoggedOut = function (params, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] --> OAuth.userLoggedOut'); }
+		if (debugOutput) { winston.verbose('[maxonID] OAuth.userLoggedOut'); }
 
-		User.getUserData(params.uid, function (err, data) {
+		user.getUserData(params.uid, function (err, data) {
 			if (err) {
-				winston.error('[maxonID] --> Could not find data for uid ' + params.uid + '. Error: ' + err);
+				winston.error('[maxonID] Could not find data for uid ' + params.uid + '. Error: ' + err);
 				return callback(err);
 			}
 
