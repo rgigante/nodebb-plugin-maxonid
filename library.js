@@ -321,15 +321,6 @@
 		});
 	};
 
-	OAuth.getOAuthidByUid = function (uid, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] --> OAuth.getOAuthidByUid'); }
-		db.getObjectField('uid', uid, function (err, oAuthid) {
-			if (err) return callback(err);
-
-			callback(null, oAuthid);
-		});
-	};
-
 	OAuth.deleteUserData = function (data, callback) {
 		if (debugOutput) { winston.verbose('[maxonID] --> OAuth.deleteUserData'); }
 
