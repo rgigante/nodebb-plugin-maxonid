@@ -1,3 +1,3 @@
 'use strict';
 
-module.exports = { extends: ['@commitlint/config-angular'] };
+module.exports = { extends: ['@commitlint/config-angular', '@commitlint/config-conventional'] };

@@ -276,7 +276,8 @@
 					db.setObjectField('fullname', payload.name + ' ' + payload.surname, uid);
 
 					// add user to "Maxon" group if registered email address belongs to "maxon.net" domain
-					if (payload.email.split('@')[1] === 'maxon.net' || payload.email.split('@')[1] === 'redgiant.com') {
+					const domain = payload.email.split('@')[1];
+					if (domain === 'maxon.net' || domain === 'redgiant.com' || domain === 'external.team') {
 						groups.join('Maxon', uid, function (err) {
 							callback(err, { uid: uid });
 						});
