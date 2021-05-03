@@ -24,6 +24,10 @@
     {
       "hook": "static:user.loggedOut",
       "method": "userLoggedOut"
-    }
+    },
+		{ 
+			"hook": "static:app.load", 
+			"method": "rerouteLanding" 
+		}
 	]
 }
