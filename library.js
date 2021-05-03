@@ -277,7 +277,7 @@
 
 					// add user to "Maxon" group if registered email address belongs to "maxon.net" domain
 					const domain = payload.email.split('@')[1];
-					if (domain === 'maxon.net' || domain === 'redgiant.com' || domain === 'external.team') {
+					if (domain === 'maxon.net' || domain === 'redgiant.com' || domain === 'external.team' || domain === 'maxon.de') {
 						groups.join('Maxon', uid, function (err) {
 							callback(err, { uid: uid });
 						});
