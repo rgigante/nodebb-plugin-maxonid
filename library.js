@@ -386,19 +386,15 @@
 	};
 
 	// Method responsible to check user authentication and deliver Maxon binaries based on actual location
-	OAuth.rerouteLanding = function (data, callback) {
+	OAuth.rerouteLanding = function (data) {
 		const app = data.app;
 
 		// re-route non authenticated users to landing
-		app.get('/', function (req, res, callback) {
+		app.get('/', function (req, res) {
 			// check the user to be logged in
 			if (req.loggedIn) res.redirect('/categories');
 			else res.redirect('/landing');
-
-			callback(null);
 		});
-
-		callback(null);
 	};
 
 	module.exports = OAuth;
