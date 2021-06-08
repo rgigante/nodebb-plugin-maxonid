@@ -28,8 +28,8 @@
     "unirest": "0.6.0"
   },
   "nbbpm": {
-    "compatibility": "^1.0.1",
-    "index": false
+    "compatibility": "^1.6.0 || ^1.7.0",
+    "index": true
   },
   "devDependencies": {
     "@commitlint/cli": "^12.1.1",
