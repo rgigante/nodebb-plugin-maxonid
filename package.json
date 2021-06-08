@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-maxonid",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Maxon ID OAuth SSO plugin",
   "main": "library.js",
   "repository": {
