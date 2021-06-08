@@ -15,9 +15,6 @@
 	// use Unirest API or Request API for making https requests
 	const useUnirestAPI = true;
 
-	// activate debug output
-	const debugOutput = false;
-
 	// create constants object
 	const constants = Object.freeze({
 		name: nconf.get('oauth_plugin:name'),
@@ -31,31 +28,35 @@
 		userRoute: nconf.get('oauth_plugin:idserver') + nconf.get('oauth_plugin:userRoute'),
 		scope: nconf.get('oauth_plugin:scope'),
 		allowedEntitlementsList: nconf.get('oauth_plugin:allowedEntitlements').split(','),
+		setFullname: nconf.get('oauth_plugin:setFullname'),
+		debugOutput: nconf.get('oauth_plugin:enableDebugOutput'),
 	});
 
-	if (debugOutput) {
+	if (constants.debugOutput !== undefined && constants.debugOutput) {
 		winston.verbose('[maxonID] Configuration');
 		console.log(constants);
 	}
 
 	// check the contants object for contain data
 	let configOk = false;
-	if (!constants.name) {
+	if (constants.name === undefined || constants.name === '') {
 		winston.error('[maxonID] Please specify a name for your OAuth provider');
-	} else if (!constants.oauth2.clientID) {
+	} else if (constants.oauth2.clientID === undefined || constants.oauth2.clientID === '') {
 		winston.error('[maxonID] ClientID required');
-	} else if (!constants.oauth2.clientSecret) {
+	} else if (constants.oauth2.clientSecret === undefined || constants.oauth2.clientSecret === '') {
 		winston.error('[maxonID] Client Secret required');
-	} else if (!constants.oauth2.authorizationURL) {
+	} else if (constants.oauth2.authorizationURL === undefined || constants.oauth2.authorizationURL === '') {
 		winston.error('[maxonID] Authorization URL required');
-	} else if (!constants.oauth2.tokenURL) {
+	} else if (constants.oauth2.tokenURL === undefined || constants.oauth2.tokenURL === '') {
 		winston.error('[maxonID] Token URL required');
-	} else if (!constants.scope) {
+	} else if (constants.scope === undefined || constants.scope === '') {
 		winston.error('[maxonID] Scope required');
-	} else if (!constants.userRoute) {
+	} else if (constants.userRoute === undefined || constants.userRoute === '') {
 		winston.error('[maxonID] User Route required');
-	} else if (!constants.allowedEntitlementsList) {
+	} else if (constants.allowedEntitlementsList === undefined || constants.allowedEntitlementsList === '') {
 		winston.error('[maxonID] Allowed entitlements list required');
+	} else if (constants.setFullname === undefined) {
+		winston.error('[maxonID] Set fullname flag required');
 	} else {
 		configOk = true;
 		winston.info('[maxonID] Config is OK');
@@ -68,7 +69,7 @@
 	oauthOptions.passReqToCallback = true;
 
 	OAuth.getStrategy = function (strategies, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] OAuth.getStrategy'); }
+		if (constants.debugOutput !== undefined && constants.debugOutput) { winston.verbose('[maxonID] OAuth.getStrategy'); }
 
 		let passportOAuth;
 		if (configOk) {
@@ -91,8 +92,8 @@
 
 					// validate the user permissions given the current access token and the list of allowed entitlements
 					OAuth.validateEntitlementsList(accessToken, constants.allowedEntitlementsList, function (err, accessAllowed) {
-						if (debugOutput) {
-							winston.verbose('[maxonID] Please specify a name for your OAuth provider');
+						if (constants.debugOutput !== undefined && constants.debugOutput) {
+							winston.verbose('[maxonID] OAuth.validateEntitlementsList');
 							console.log('validateEntitlementsList result:', accessAllowed);
 						}
 
@@ -115,7 +116,7 @@
 								profile.provider = constants.name;
 								profile.isAdmin = false;
 
-								if (debugOutput) {
+								if (constants.debugOutput !== undefined && constants.debugOutput) {
 									winston.verbose('[maxonID] Profile:');
 									console.log(profile);
 								}
@@ -132,7 +133,7 @@
 			passport.use(constants.name, new passportOAuth(oauthOptions, function (req, token, secret, profile, done) {
 				OAuth.login({
 					oAuthid: profile.id,
-					handle: profile.displayName,
+					handle: profile.handle,
 					email: profile.emails[0].value,
 					isAdmin: profile.isAdmin,
 					name: profile.givenName,
@@ -162,7 +163,7 @@
 	};
 
 	OAuth.validateEntitlementsList = function (token, entitlementsList, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] OAuth.validateEntitlementsList'); }
+		if (constants.debugOutput !== undefined && constants.debugOutput) { winston.verbose('[maxonID] OAuth.validateEntitlementsList'); }
 		let completed_requests = 0; // count the number of requests completed
 		let isAllowed = false; // store (sums via or) the entitlements allowance
 		// loop through all the entitlements set in nodebb config.json
@@ -173,6 +174,7 @@
 				// sum the allowance
 				isAllowed = isAllowed || response;
 				completed_requests += 1;
+
 				if (completed_requests === entitlementsList.length) {
 					// return only all the requests have been completed
 					callback(null, isAllowed);
@@ -182,10 +184,11 @@
 	};
 
 	OAuth.checkEntitlement = function (inputData, callback) {
-		if (debugOutput) winston.verbose('[maxonID] OAuth.checkEntitlement');
+		const checkURL = nconf.get('oauth_plugin:idserver') + '/authz/.json?' + inputData[1] + '&doConsume=false';
+		if (constants.debugOutput !== undefined && constants.debugOutput) winston.verbose('[maxonID] OAuth.checkEntitlement');
 		if (useUnirestAPI) {
 			const unirest = require('unirest');
-			unirest('GET', nconf.get('oauth_plugin:idserver') + '/authz/.json?' + inputData[1] + '&doConsume=false')
+			unirest('GET', checkURL)
 				.headers({
 					Authorization: 'Bearer ' + inputData[0],
 				})
@@ -193,19 +196,19 @@
 					if (response.error) throw new Error(response.error);
 
 					const parsedBody = JSON.parse(response.raw_body);
-					if (debugOutput) console.log(parsedBody);
+					if (constants.debugOutput !== undefined && constants.debugOutput) console.log(parsedBody);
 					if (typeof parsedBody[inputData[1]] !== 'undefined') {
-						if (debugOutput) console.log(inputData[1], parsedBody[inputData[1]]);
+						if (constants.debugOutput !== undefined && constants.debugOutput) console.log(inputData[1], parsedBody[inputData[1]]);
 						return (callback(parsedBody[inputData[1]]));
 					}
-					if (debugOutput) console.log(inputData[1], false);
+					if (constants.debugOutput !== undefined && constants.debugOutput) console.log(inputData[1], false);
 					return (callback(false));
 				});
 		} else {
 			const request = require('request');
 			const requestOptions = {
 				method: 'GET',
-				url: 'https://id-dev.villa.maxon.net/authz/.json?' + inputData[1] + '&doConsume=false',
+				url: checkURL,
 				headers: {
 					Authorization: 'Bearer ' + inputData[0],
 				},
@@ -214,19 +217,19 @@
 				if (error) { throw new Error(error); }
 
 				const parsedBody = JSON.parse(response.body);
-				if (debugOutput) console.log(parsedBody);
+				if (constants.debugOutput !== undefined && constants.debugOutput) console.log(parsedBody);
 				if (typeof parsedBody[inputData[1]] !== 'undefined') {
-					if (debugOutput) console.log(inputData[1], parsedBody[inputData[1]]);
+					if (constants.debugOutput !== undefined && constants.debugOutput) console.log(inputData[1], parsedBody[inputData[1]]);
 					return (callback(parsedBody[inputData[1]]));
 				}
-				if (debugOutput) console.log(inputData[1], false);
+				if (constants.debugOutput !== undefined && constants.debugOutput) console.log(inputData[1], false);
 				return (callback(false));
 			});
 		}
 	};
 
 	OAuth.parseUserReturn = function (data, callback) {
-		if (debugOutput) {
+		if (constants.debugOutput !== undefined && constants.debugOutput) {
 			winston.verbose('[maxonID] OAuth.parseUserReturn');
 			console.log(data);
 		}
@@ -235,27 +238,25 @@
 		profile.id = data.sub;
 		profile.givenName = data.given_name;
 		profile.familyName = data.family_name;
-
-		// check given_name and family_name to generate a proper username (aka displayName)
-		if (data.given_name === undefined || data.given_name === '' || data.family_name === undefined || data.family_name === '') {
-			profile.displayName = data.email.split('@')[0];
-		} else {
-			profile.displayName = data.given_name.toLowerCase()[0] + '_' + data.family_name.toLowerCase();
-		}
 		profile.emails = [{ value: data.email }];
 
-		// eslint-disable-next-line
+		if (data.nickname === undefined || data.nickname === '') {
+			profile.handle = data.email.split('@')[0];
+		} else {
+			profile.handle = data.nickname;
+		}
+
 		callback(null, profile);
 	};
 
 	OAuth.login = function (payload, callback) {
-		if (debugOutput) {
+		if (constants.debugOutput !== undefined && constants.debugOutput) {
 			winston.verbose('[maxonID] OAuth.login');
 			console.log(payload);
 		}
 
 		OAuth.getUidByOAuthid(payload.oAuthid, function (err, uid) {
-			if (debugOutput) { winston.verbose('[maxonID] OAuth.getUidByOAuthid'); }
+			if (constants.debugOutput !== undefined && constants.debugOutput) { winston.verbose('[maxonID] OAuth.getUidByOAuthid'); }
 
 			if (err) { return callback(err); }
 
@@ -271,9 +272,12 @@
 					user.setUserField(uid, constants.name + 'Id', payload.oAuthid);
 					db.setObjectField(constants.name + 'Id:uid', payload.oAuthid, uid);
 
-					// store name and surname
-					user.setUserField(uid, 'fullname', payload.name + ' ' + payload.surname);
-					db.setObjectField('fullname', payload.name + ' ' + payload.surname, uid);
+					// check given_name and family_name to generate a proper username (aka displayName)
+					if (constants.setFullname && payload.name !== undefined && payload.name !== '' && payload.surname !== undefined && payload.surname !== '') {
+						// set fullname
+						user.setUserField(uid, 'fullname', payload.name + ' ' + payload.surname);
+						db.setObjectField('fullname', payload.name + ' ' + payload.surname, uid);
+					}
 
 					// add user to "Maxon" group if registered email address belongs to "maxon.net" domain
 					const domain = payload.email.split('@')[1];
@@ -314,7 +318,7 @@
 	};
 
 	OAuth.getUidByOAuthid = function (oAuthid, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] OAuth.getUidByOAuthid'); }
+		if (constants.debugOutput !== undefined && constants.debugOutput) { winston.verbose('[maxonID] OAuth.getUidByOAuthid'); }
 		db.getObjectField(constants.name + 'Id:uid', oAuthid, function (err, uid) {
 			if (err) return callback(err);
 
@@ -323,7 +327,7 @@
 	};
 
 	OAuth.deleteUserData = function (data, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] OAuth.deleteUserData'); }
+		if (constants.debugOutput !== undefined && constants.debugOutput) { winston.verbose('[maxonID] OAuth.deleteUserData'); }
 
 		async.waterfall([
 			async.apply(user.getUserField, data.uid, constants.name + 'Id'),
@@ -342,14 +346,14 @@
 
 	// If this filter is not there, the deleteUserData function will fail when getting the oauthId for deletion.
 	OAuth.whitelistFields = function (params, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] OAuth.whitelistFields'); }
+		if (constants.debugOutput !== undefined && constants.debugOutput) { winston.verbose('[maxonID] OAuth.whitelistFields'); }
 
 		params.whitelist.push(constants.name + 'Id');
 		callback(null, params);
 	};
 
 	OAuth.redirectLogout = function (payload, callback) {
-		if (debugOutput) {
+		if (constants.debugOutput !== undefined && constants.debugOutput) {
 			winston.verbose('[maxonID] OAuth.redirectLogout');
 			console.log('userMaxonIDIsEmpty: ', OAuth.userMaxonIDIsEmpty);
 		}
@@ -370,7 +374,7 @@
 	};
 
 	OAuth.userLoggedOut = function (params, callback) {
-		if (debugOutput) { winston.verbose('[maxonID] OAuth.userLoggedOut'); }
+		if (constants.debugOutput !== undefined && constants.debugOutput) { winston.verbose('[maxonID] OAuth.userLoggedOut'); }
 
 		user.getUserData(params.uid, function (err, data) {
 			if (err) {
