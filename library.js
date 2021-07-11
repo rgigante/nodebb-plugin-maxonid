@@ -28,6 +28,7 @@
 		userRoute: nconf.get('oauth_plugin:idserver') + nconf.get('oauth_plugin:userRoute'),
 		scope: nconf.get('oauth_plugin:scope'),
 		allowedEntitlementsList: nconf.get('oauth_plugin:allowedEntitlements').split(','),
+		premiumGroupId: nconf.get('oauth_plugin:premiumGroupId'),
 		setFullname: nconf.get('oauth_plugin:setFullname'),
 		debugOutput: nconf.get('oauth_plugin:enableDebugOutput'),
 	});
@@ -101,10 +102,10 @@
 							return done(err);
 						}
 
-						if (!accessAllowed) {
-							// Need to find a way to gracefully notify the user and point back to login page
-							return done(new Error('Forum access is not granted. Please contact your Maxon representative.'));
-						}
+						// if (!accessAllowed) {
+						// 	// Need to find a way to gracefully notify the user and point back to login page
+						// 	return done(new Error('Forum access is not granted. Please contact your Maxon representative.'));
+						// }
 
 						try {
 							const parsedBody = JSON.parse(body);
@@ -114,7 +115,7 @@
 								}
 
 								profile.provider = constants.name;
-								profile.isAdmin = false;
+								profile.isPremium = accessAllowed;
 
 								if (constants.debugOutput !== undefined && constants.debugOutput) {
 									winston.verbose('[maxonID] Profile:');
@@ -135,7 +136,7 @@
 					oAuthid: profile.id,
 					handle: profile.handle,
 					email: profile.emails[0].value,
-					isAdmin: profile.isAdmin,
+					isPremium: profile.isPremium,
 					name: profile.givenName,
 					surname: profile.familyName,
 				}, function (err, user) {
@@ -262,6 +263,19 @@
 
 			if (uid !== null) {
 				// Existing user
+
+				// add user to premium group
+				if (payload.isPremium) {
+					if (constants.debugOutput !== undefined && constants.debugOutput) { winston.verbose('[maxonID] Existing user is Premium, join the group'); }
+					groups.join(constants.premiumGroupId, uid, function (err) {
+						callback(err, { uid: uid });
+					});
+				} else {
+					if (constants.debugOutput !== undefined && constants.debugOutput) { winston.verbose('[maxonID] Existing user is Premium, leave the group'); }
+					groups.leave(constants.premiumGroupId, uid, function (err) {
+						callback(err, { uid: uid });
+					});
+				}
 				callback(null, {
 					uid: uid,
 				});
@@ -287,9 +301,10 @@
 						});
 					}
 
-					// add user to administrator group
-					if (payload.isAdmin) {
-						groups.join('administrators', uid, function (err) {
+					// add user to premium group
+					if (payload.isPremium) {
+						if (constants.debugOutput !== undefined && constants.debugOutput) { winston.verbose('[maxonID] New user is Premium, join the group'); }
+						groups.join(constants.premiumGroupId, uid, function (err) {
 							callback(err, { uid: uid });
 						});
 					}
